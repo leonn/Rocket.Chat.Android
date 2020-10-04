@@ -4,13 +4,14 @@ import DrawableHelper
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.text.method.ScrollingMovementMethod
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import chat.rocket.android.R
 import chat.rocket.android.chatroom.presentation.ChatRoomNavigator
 import chat.rocket.android.server.domain.GetCurrentServerInteractor
-import chat.rocket.android.server.infraestructure.ConnectionManagerFactory
+import chat.rocket.android.server.infrastructure.ConnectionManagerFactory
 import chat.rocket.android.util.extensions.addFragment
 import chat.rocket.android.util.extensions.textContent
 import dagger.android.AndroidInjection
@@ -24,9 +25,9 @@ fun Context.chatRoomIntent(
     chatRoomId: String,
     chatRoomName: String,
     chatRoomType: String,
-    isReadOnly: Boolean,
+    isReadOnly: Boolean?,
     chatRoomLastSeen: Long,
-    isSubscribed: Boolean = true,
+    isSubscribed: Boolean? = true,
     isCreator: Boolean = false,
     isFavorite: Boolean = false,
     chatRoomMessage: String? = null
@@ -71,7 +72,7 @@ class ChatRoomActivity : AppCompatActivity(), HasSupportFragmentInjector {
         // Workaround for when we are coming to the app via the recents app and the app was killed.
         val serverUrl = serverInteractor.get()
         if (serverUrl != null) {
-            managerFactory.create(serverUrl).connect()
+            managerFactory.create(serverUrl)?.connect()
         } else {
             navigator.toNewServer()
             return
@@ -139,10 +140,11 @@ class ChatRoomActivity : AppCompatActivity(), HasSupportFragmentInjector {
     }
 
     fun setupExpandMoreForToolbar(listener: (View) -> Unit) {
-        DrawableHelper.compoundRightDrawable(
+        DrawableHelper.compoundEndDrawable(
             text_toolbar_title,
             DrawableHelper.getDrawableFromId(R.drawable.ic_chatroom_toolbar_expand_more_20dp, this)
         )
+        text_toolbar_title.movementMethod = ScrollingMovementMethod()
         text_toolbar_title.setOnClickListener { listener(it) }
     }
 

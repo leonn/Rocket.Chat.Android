@@ -5,9 +5,8 @@ import chat.rocket.android.core.lifecycle.CancelStrategy
 import chat.rocket.android.db.DatabaseManager
 import chat.rocket.android.db.model.ChatRoomEntity
 import chat.rocket.android.directory.uimodel.DirectoryUiModelMapper
-import chat.rocket.android.helper.UserHelper
 import chat.rocket.android.main.presentation.MainNavigator
-import chat.rocket.android.server.infraestructure.RocketChatClientFactory
+import chat.rocket.android.server.infrastructure.RocketChatClientFactory
 import chat.rocket.android.util.extension.launchUI
 import chat.rocket.common.model.RoomType
 import chat.rocket.common.model.roomTypeOf
@@ -28,28 +27,28 @@ class DirectoryPresenter @Inject constructor(
     private val view: DirectoryView,
     private val navigator: MainNavigator,
     private val strategy: CancelStrategy,
-    @Named("currentServer") private val currentServer: String,
+    @Named("currentServer") private val currentServer: String?,
     private val dbManager: DatabaseManager,
-    private val userHelper: UserHelper,
     val factory: RocketChatClientFactory,
     private val mapper: DirectoryUiModelMapper
 ) {
-    private val client: RocketChatClient = factory.get(currentServer)
+    private val client: RocketChatClient? = currentServer?.let { factory.get(it) }
     private var offset: Long = 0
 
     fun loadAllDirectoryChannels(query: String? = null) {
         launchUI(strategy) {
             try {
                 view.showLoading()
-                val directoryResult = client.directory(
+                client?.directory(
                     text = query,
                     directoryRequestType = DirectoryRequestType.Channels(),
                     offset = offset,
                     count = 60
-                )
-                val directoryUiModels = mapper.mapToUiModelList(directoryResult.result)
-                view.showChannels(directoryUiModels)
-                offset += 1 * 60L
+                )?.let {
+                    val directoryUiModels = mapper.mapToUiModelList(it.result)
+                    view.showChannels(directoryUiModels)
+                    offset += 1 * 60L
+                }
             } catch (exception: Exception) {
                 exception.message?.let {
                     view.showMessage(it)
@@ -66,7 +65,7 @@ class DirectoryPresenter @Inject constructor(
         launchUI(strategy) {
             try {
                 view.showLoading()
-                val directoryResult = client.directory(
+                client?.directory(
                     text = query,
                     directoryRequestType = DirectoryRequestType.Users(),
                     directoryWorkspaceType = if (isSearchForGlobalUsers) {
@@ -76,10 +75,11 @@ class DirectoryPresenter @Inject constructor(
                     },
                     offset = offset,
                     count = 60
-                )
-                val directoryUiModels = mapper.mapToUiModelList(directoryResult.result)
-                view.showUsers(directoryUiModels)
-                offset += 1 * 60L
+                )?.let {
+                    val directoryUiModels = mapper.mapToUiModelList(it.result)
+                    view.showUsers(directoryUiModels)
+                    offset += 1 * 60L
+                }
             } catch (exception: Exception) {
                 exception.message?.let {
                     view.showMessage(it)
@@ -110,18 +110,19 @@ class DirectoryPresenter @Inject constructor(
             try {
                 view.showLoading()
                 withContext(Dispatchers.Default) {
-                    val chatRoom = client.getInfo(channelId, name, roomTypeOf(RoomType.CHANNEL))
-                    navigator.toChatRoom(
-                        chatRoomId = channelId,
-                        chatRoomName = name,
-                        chatRoomType = RoomType.CHANNEL,
-                        isReadOnly = chatRoom.readonly,
-                        chatRoomLastSeen = -1,
-                        isSubscribed = false,
-                        isCreator = false,
-                        isFavorite = false
-                    )
-
+                    client?.getInfo(channelId, name, roomTypeOf(RoomType.CHANNEL))
+                        ?.let { chatRoom ->
+                            navigator.toChatRoom(
+                                chatRoomId = channelId,
+                                chatRoomName = name,
+                                chatRoomType = RoomType.CHANNEL,
+                                isReadOnly = chatRoom.readonly,
+                                chatRoomLastSeen = -1,
+                                isSubscribed = false,
+                                isCreator = false,
+                                isFavorite = false
+                            )
+                        }
                 }
             } catch (ex: Exception) {
                 Timber.e(ex)
@@ -136,38 +137,40 @@ class DirectoryPresenter @Inject constructor(
         }
     }
 
-    fun tiDirectMessage(username: String, name: String) {
+    fun toDirectMessage(username: String, name: String) {
         launchUI(strategy) {
             try {
                 view.showLoading()
 
                 withContext(Dispatchers.Default) {
-                    val directMessage = client.createDirectMessage(username)
+                    client?.createDirectMessage(username)?.let { directMessage ->
+                        val chatRoomEntity = ChatRoomEntity(
+                            id = directMessage.id,
+                            parentId = null,
+                            name = username,
+                            description = null,
+                            type = RoomType.DIRECT_MESSAGE,
+                            fullname = name,
+                            subscriptionId = "",
+                            updatedAt = directMessage.updatedAt
+                        )
 
-                    val chatRoomEntity = ChatRoomEntity(
-                        id = directMessage.id,
-                        name = username,
-                        description = null,
-                        type = RoomType.DIRECT_MESSAGE,
-                        fullname = name,
-                        subscriptionId = "",
-                        updatedAt = directMessage.updatedAt
-                    )
+                        dbManager.insertOrReplaceRoom(chatRoomEntity)
 
-                    dbManager.insertOrReplaceRoom(chatRoomEntity)
+                        FetchChatRoomsInteractor(client, dbManager).refreshChatRooms()
 
-                    FetchChatRoomsInteractor(client, dbManager).refreshChatRooms()
+                        navigator.toChatRoom(
+                            chatRoomId = chatRoomEntity.id,
+                            chatRoomName = chatRoomEntity.name,
+                            chatRoomType = chatRoomEntity.type,
+                            isReadOnly = false,
+                            chatRoomLastSeen = -1,
+                            isSubscribed = chatRoomEntity.open,
+                            isCreator = true,
+                            isFavorite = false
+                        )
 
-                    navigator.toChatRoom(
-                        chatRoomId = chatRoomEntity.id,
-                        chatRoomName = chatRoomEntity.name,
-                        chatRoomType = chatRoomEntity.type,
-                        isReadOnly = false,
-                        chatRoomLastSeen = -1,
-                        isSubscribed = chatRoomEntity.open,
-                        isCreator = true,
-                        isFavorite = false
-                    )
+                    }
                 }
             } catch (ex: Exception) {
                 Timber.e(ex)

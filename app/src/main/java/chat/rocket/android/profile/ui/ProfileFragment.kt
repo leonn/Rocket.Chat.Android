@@ -3,6 +3,7 @@ package chat.rocket.android.profile.ui
 import DrawableHelper
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
@@ -21,6 +22,9 @@ import androidx.fragment.app.Fragment
 import chat.rocket.android.R
 import chat.rocket.android.analytics.AnalyticsManager
 import chat.rocket.android.analytics.event.ScreenViewEvent
+import chat.rocket.android.helper.AndroidPermissionsHelper
+import chat.rocket.android.helper.AndroidPermissionsHelper.getCameraPermission
+import chat.rocket.android.helper.AndroidPermissionsHelper.hasCameraPermission
 import chat.rocket.android.main.ui.MainActivity
 import chat.rocket.android.profile.presentation.ProfilePresenter
 import chat.rocket.android.profile.presentation.ProfileView
@@ -31,10 +35,10 @@ import chat.rocket.android.util.extensions.inflate
 import chat.rocket.android.util.extensions.showToast
 import chat.rocket.android.util.extensions.textContent
 import chat.rocket.android.util.extensions.ui
-import chat.rocket.android.util.invalidateFirebaseToken
 import chat.rocket.common.model.UserStatus
 import chat.rocket.common.model.userStatusOf
 import com.facebook.drawee.backends.pipeline.Fresco
+import com.google.android.material.snackbar.Snackbar
 import dagger.android.support.AndroidSupportInjection
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.rxkotlin.Observables
@@ -52,8 +56,10 @@ private const val REQUEST_CODE_FOR_PERFORM_CAMERA = 2
 fun newInstance() = ProfileFragment()
 
 class ProfileFragment : Fragment(), ProfileView, ActionMode.Callback {
-    @Inject lateinit var presenter: ProfilePresenter
-    @Inject lateinit var analyticsManager: AnalyticsManager
+    @Inject
+    lateinit var presenter: ProfilePresenter
+    @Inject
+    lateinit var analyticsManager: AnalyticsManager
     private var currentStatus = ""
     private var currentName = ""
     private var currentUsername = ""
@@ -137,14 +143,19 @@ class ProfileFragment : Fragment(), ProfileView, ActionMode.Callback {
 
     override fun reloadUserAvatar(avatarUrl: String) {
         Fresco.getImagePipeline().evictFromCache(avatarUrl.toUri())
-        image_avatar.setImageURI(avatarUrl)
+        image_avatar?.setImageURI(avatarUrl)
     }
 
-    override fun showProfileUpdateSuccessfullyMessage() {
+    override fun onProfileUpdatedSuccessfully(
+        updatedEmail: String,
+        updatedName: String,
+        updatedUserName: String
+    ) {
+        currentEmail = updatedEmail
+        currentName = updatedName
+        currentUsername = updatedUserName
         showMessage(getString(R.string.msg_profile_updated_successfully))
     }
-
-    override fun invalidateToken(token: String) = invalidateFirebaseToken(token)
 
     override fun showLoading() {
         enableUserInput(false)
@@ -181,22 +192,22 @@ class ProfileFragment : Fragment(), ProfileView, ActionMode.Callback {
     override fun onActionItemClicked(mode: ActionMode, menuItem: MenuItem): Boolean {
         return when (menuItem.itemId) {
             R.id.action_update_profile -> {
-                presenter.updateUserProfile(
-                    text_email.textContent,
-                    text_name.textContent,
-                    text_username.textContent
-                )
+                updateProfile()
                 mode.finish()
                 true
             }
-            else -> {
-                false
-            }
+            else -> false
         }
     }
 
     override fun onDestroyActionMode(mode: ActionMode) {
         actionMode = null
+        if (text_email.textContent != currentEmail
+            || text_username.textContent != currentUsername
+            || text_name.textContent != currentName
+        ) {
+            showChangesNotSavedDialog()
+        }
     }
 
     private fun setupToolbar() {
@@ -223,13 +234,24 @@ class ProfileFragment : Fragment(), ProfileView, ActionMode.Callback {
         }
 
         button_take_a_photo.setOnClickListener {
-            dispatchTakePicture(REQUEST_CODE_FOR_PERFORM_CAMERA)
+            context?.let {
+                if (hasCameraPermission(it)) {
+                    dispatchTakePicture(REQUEST_CODE_FOR_PERFORM_CAMERA)
+                } else {
+                    getCameraPermission(this)
+                }
+            }
             hideUpdateAvatarOptions()
         }
 
         button_reset_avatar.setOnClickListener {
             hideUpdateAvatarOptions()
             presenter.resetAvatar()
+        }
+
+        button_view_profile_photo.setOnClickListener {
+            hideUpdateAvatarOptions()
+            presenter.toProfileImage()
         }
     }
 
@@ -267,8 +289,8 @@ class ProfileFragment : Fragment(), ProfileView, ActionMode.Callback {
             text_email.asObservable()
         ) { text_name, text_username, text_email ->
             return@combineLatest (text_name.toString() != currentName ||
-                text_username.toString() != currentUsername ||
-                text_email.toString() != currentEmail)
+                    text_username.toString() != currentUsername ||
+                    text_email.toString() != currentEmail)
         }.subscribe { isValid ->
             activity?.invalidateOptionsMenu()
             if (isValid) {
@@ -330,5 +352,55 @@ class ProfileFragment : Fragment(), ProfileView, ActionMode.Callback {
                     dialog.dismiss()
                 }.show()
         }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        when (requestCode) {
+            AndroidPermissionsHelper.CAMERA_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // permission was granted
+                    dispatchTakePicture(REQUEST_CODE_FOR_PERFORM_CAMERA)
+                } else {
+                    // permission denied
+                    Snackbar.make(
+                        relative_layout,
+                        R.string.msg_camera_permission_denied,
+                        Snackbar.LENGTH_SHORT
+                    ).show()
+                }
+                return
+            }
+        }
+    }
+
+    private fun showChangesNotSavedDialog() {
+        context?.let {
+            val builder = AlertDialog.Builder(it)
+            builder.setMessage(R.string.msg_changes_not_saved)
+                .setPositiveButton(R.string.msg_save) { _, _ ->
+                    updateProfile()
+                }
+                .setNegativeButton(android.R.string.cancel) { _, _ ->
+                    text_email.setText(currentEmail)
+                    text_username.setText(currentUsername)
+                    text_name.setText(currentName)
+                }
+                .create()
+                .show()
+        }
+
+    }
+
+    private fun updateProfile() {
+        presenter.updateUserProfile(
+            text_email.textContent,
+            text_name.textContent,
+            text_username.textContent
+        )
     }
 }

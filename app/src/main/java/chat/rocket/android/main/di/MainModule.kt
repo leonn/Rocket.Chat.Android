@@ -1,6 +1,7 @@
 package chat.rocket.android.main.di
 
 import androidx.lifecycle.LifecycleOwner
+import chat.rocket.android.core.behaviours.AppLanguageView
 import chat.rocket.android.core.lifecycle.CancelStrategy
 import chat.rocket.android.dagger.scope.PerActivity
 import chat.rocket.android.main.presentation.MainNavigator
@@ -18,7 +19,13 @@ class MainModule {
 
     @Provides
     @PerActivity
-    fun provideJob() = Job()
+    fun appLanguageView(activity: MainActivity): AppLanguageView {
+        return activity
+    }
+
+    @Provides
+    @PerActivity
+    fun provideJob(): Job = Job()
 
     @Provides
     fun provideLifecycleOwner(activity: MainActivity): LifecycleOwner = activity

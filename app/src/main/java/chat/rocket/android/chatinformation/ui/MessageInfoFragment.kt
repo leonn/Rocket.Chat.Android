@@ -34,10 +34,8 @@ internal const val TAG_MESSAGE_INFO_FRAGMENT = "MessageInfoFragment"
 private const val BUNDLE_MESSAGE_ID = "message_id"
 
 class MessageInfoFragment : Fragment(), MessageInfoView {
-    @Inject
-    lateinit var presenter: MessageInfoPresenter
-    @Inject
-    lateinit var analyticsManager: AnalyticsManager
+    @Inject lateinit var presenter: MessageInfoPresenter
+    @Inject lateinit var analyticsManager: AnalyticsManager
     private lateinit var adapter: ReadReceiptAdapter
     private lateinit var messageId: String
 
@@ -47,7 +45,7 @@ class MessageInfoFragment : Fragment(), MessageInfoView {
 
         val bundle = arguments
         if (bundle != null) {
-            messageId = bundle.getString(BUNDLE_MESSAGE_ID)
+            messageId = bundle.getString(BUNDLE_MESSAGE_ID, "")
         } else {
             requireNotNull(bundle) { "no arguments supplied when the fragment was instantiated" }
         }
