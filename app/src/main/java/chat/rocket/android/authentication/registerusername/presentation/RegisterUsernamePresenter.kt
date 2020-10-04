@@ -12,9 +12,8 @@ import chat.rocket.android.server.domain.SaveCurrentServerInteractor
 import chat.rocket.android.server.domain.TokenRepository
 import chat.rocket.android.server.domain.favicon
 import chat.rocket.android.server.domain.model.Account
-import chat.rocket.android.server.domain.siteName
 import chat.rocket.android.server.domain.wideTile
-import chat.rocket.android.server.infrastructure.RocketChatClientFactory
+import chat.rocket.android.server.infraestructure.RocketChatClientFactory
 import chat.rocket.android.util.extension.launchUI
 import chat.rocket.android.util.extensions.avatarUrl
 import chat.rocket.android.util.extensions.serverLogoUrl
@@ -40,8 +39,7 @@ class RegisterUsernamePresenter @Inject constructor(
 ) {
     private val currentServer = serverInteractor.get()!!
     private val client: RocketChatClient = factory.get(currentServer)
-    private var settings: PublicSettings = settingsInteractor.get(currentServer)
-    private val token = tokenRepository.get(currentServer)
+    private var settings: PublicSettings = settingsInteractor.get(serverInteractor.get()!!)
 
     fun registerUsername(username: String, userId: String, authToken: String) {
         launchUI(strategy) {
@@ -74,24 +72,15 @@ class RegisterUsernamePresenter @Inject constructor(
         }
     }
 
-    private fun saveAccount(username: String) {
+    private suspend fun saveAccount(username: String) {
         val icon = settings.favicon()?.let {
             currentServer.serverLogoUrl(it)
         }
         val logo = settings.wideTile()?.let {
             currentServer.serverLogoUrl(it)
         }
-        val thumb = currentServer.avatarUrl(username, token?.userId, token?.authToken)
-        val account = Account(
-            serverName = settings.siteName() ?: currentServer,
-            serverUrl = currentServer,
-            serverLogoUrl = icon,
-            serverBackgroundImageUrl = logo,
-            userName = username,
-            userAvatarUrl = thumb,
-            authToken = token?.authToken,
-            userId = token?.userId
-        )
+        val thumb = currentServer.avatarUrl(username)
+        val account = Account(currentServer, icon, logo, username, thumb)
         saveAccountInteractor.save(account)
     }
 }

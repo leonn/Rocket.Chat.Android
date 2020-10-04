@@ -16,7 +16,7 @@
         app:tabMaxWidth="48dp"
         app:tabMode="scrollable" />
 
-    <chat.rocket.android.emoji.EmojiViewPager
+    <androidx.viewpager.widget.ViewPager
         android:id="@+id/pager_categories"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

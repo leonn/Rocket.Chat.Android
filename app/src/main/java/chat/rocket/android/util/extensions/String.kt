@@ -4,7 +4,6 @@ import android.graphics.Color
 import android.util.Patterns
 import chat.rocket.common.model.Token
 import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import timber.log.Timber
 
 fun String.removeTrailingSlash(): String {
@@ -22,15 +21,13 @@ fun String.sanitize(): String {
 
 fun String.avatarUrl(
     avatar: String,
-    userId: String?,
-    token: String?,
     isGroupOrChannel: Boolean = false,
     format: String = "jpeg"
 ): String {
     return if (isGroupOrChannel) {
-        "${removeTrailingSlash()}/avatar/%23${avatar.removeTrailingSlash()}?format=$format&rc_uid=$userId&rc_token=$token"
+        "${removeTrailingSlash()}/avatar/%23${avatar.removeTrailingSlash()}?format=$format"
     } else {
-        "${removeTrailingSlash()}/avatar/${avatar.removeTrailingSlash()}?format=$format&rc_uid=$userId&rc_token=$token"
+        "${removeTrailingSlash()}/avatar/${avatar.removeTrailingSlash()}?format=$format"
     }
 }
 
@@ -72,8 +69,8 @@ fun String.userId(userId: String?): String? {
     return userId?.let { this.replace(it, "") }
 }
 
-fun String.lowercaseUrl(): String? = this.toHttpUrlOrNull()?.run {
-    newBuilder().scheme(scheme.toLowerCase()).build().toString()
+fun String.lowercaseUrl(): String? = HttpUrl.parse(this)?.run {
+    newBuilder().scheme(scheme().toLowerCase()).build().toString()
 }
 
 fun String?.isNotNullNorEmpty(): Boolean = this != null && this.isNotEmpty()

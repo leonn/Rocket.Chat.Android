@@ -2,7 +2,7 @@ package chat.rocket.android.authentication.loginoptions.presentation
 
 import chat.rocket.android.analytics.AnalyticsManager
 import chat.rocket.android.analytics.event.AuthenticationEvent
-import chat.rocket.android.authentication.domain.model.DeepLinkInfo
+import chat.rocket.android.authentication.domain.model.LoginDeepLinkInfo
 import chat.rocket.android.authentication.presentation.AuthenticationNavigator
 import chat.rocket.android.core.lifecycle.CancelStrategy
 import chat.rocket.android.infrastructure.LocalRepository
@@ -14,9 +14,8 @@ import chat.rocket.android.server.domain.SaveCurrentServerInteractor
 import chat.rocket.android.server.domain.TokenRepository
 import chat.rocket.android.server.domain.favicon
 import chat.rocket.android.server.domain.model.Account
-import chat.rocket.android.server.domain.siteName
 import chat.rocket.android.server.domain.wideTile
-import chat.rocket.android.server.infrastructure.RocketChatClientFactory
+import chat.rocket.android.server.infraestructure.RocketChatClientFactory
 import chat.rocket.android.util.extension.launchUI
 import chat.rocket.android.util.extensions.avatarUrl
 import chat.rocket.android.util.extensions.serverLogoUrl
@@ -55,7 +54,6 @@ class LoginOptionsPresenter @Inject constructor(
 ) {
     // TODO - we should validate the current server when opening the app, and have a nonnull get()
     private var currentServer = serverInteractor.get()!!
-    private val token = tokenRepository.get(currentServer)
     private lateinit var client: RocketChatClient
     private lateinit var settings: PublicSettings
     private lateinit var credentialToken: String
@@ -90,7 +88,7 @@ class LoginOptionsPresenter @Inject constructor(
         doAuthentication(TYPE_LOGIN_SAML)
     }
 
-    fun authenticateWithDeepLink(deepLinkInfo: DeepLinkInfo) {
+    fun authenticateWithDeepLink(deepLinkInfo: LoginDeepLinkInfo) {
         val serverUrl = deepLinkInfo.url
         setupConnectionInfo(serverUrl)
         if (deepLinkInfo.userId != null && deepLinkInfo.token != null) {
@@ -147,7 +145,6 @@ class LoginOptionsPresenter @Inject constructor(
                     )
                     localRepository.saveCurrentUser(url = currentServer, user = user)
                     saveCurrentServer.save(currentServer)
-                    localRepository.save(LocalRepository.CURRENT_USERNAME_KEY, username)
                     saveAccount(username)
                     saveToken(token)
                     analyticsManager.logLogin(loginMethod, true)
@@ -183,17 +180,8 @@ class LoginOptionsPresenter @Inject constructor(
         val logo = settings.wideTile()?.let {
             currentServer.serverLogoUrl(it)
         }
-        val thumb = currentServer.avatarUrl(username, token?.userId, token?.authToken)
-        val account = Account(
-            serverName = settings.siteName() ?: currentServer,
-            serverUrl = currentServer,
-            serverLogoUrl = icon,
-            serverBackgroundImageUrl = logo,
-            userName = username,
-            userAvatarUrl = thumb,
-            authToken = token?.authToken,
-            userId = token?.userId
-        )
+        val thumb = currentServer.avatarUrl(username)
+        val account = Account(currentServer, icon, logo, username, thumb)
         saveAccountInteractor.save(account)
     }
 

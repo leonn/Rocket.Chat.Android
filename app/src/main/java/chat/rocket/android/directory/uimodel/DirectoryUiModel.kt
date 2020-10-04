@@ -1,13 +1,11 @@
 package chat.rocket.android.directory.uimodel
 
 import chat.rocket.android.util.extensions.avatarUrl
-import chat.rocket.common.model.Token
 import chat.rocket.core.model.DirectoryResult
 
 class DirectoryUiModel(
     private val directoryResult: DirectoryResult,
-    private val baseUrl: String?,
-    private val token: Token?
+    private val baseUrl: String?
 ) {
     val id: String = directoryResult.id
     val channelAvatarUri: String?
@@ -24,12 +22,12 @@ class DirectoryUiModel(
     }
 
     private fun getChannelAvatar(): String? {
-        return baseUrl?.avatarUrl(name, token?.userId, token?.authToken, isGroupOrChannel = true)
+        return baseUrl?.avatarUrl(name, isGroupOrChannel = true)
     }
 
     private fun getUserAvatar(): String? {
         return directoryResult.username?.let {
-            baseUrl?.avatarUrl(it, token?.userId, token?.authToken)
+            baseUrl?.avatarUrl(it)
         }
     }
 }

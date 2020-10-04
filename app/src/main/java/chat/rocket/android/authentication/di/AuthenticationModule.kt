@@ -19,7 +19,7 @@ class AuthenticationModule {
 
     @Provides
     @PerActivity
-    fun provideJob(): Job = Job()
+    fun provideJob() = Job()
 
     @Provides
     @PerActivity

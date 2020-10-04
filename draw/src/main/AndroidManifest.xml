@@ -5,8 +5,7 @@
     <application android:name=".DrawApplication">
         <activity
             android:name=".main.ui.DrawingActivity"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-            android:configChanges="orientation|screenSize|keyboardHidden"/>
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
     </application>
 
 </manifest>

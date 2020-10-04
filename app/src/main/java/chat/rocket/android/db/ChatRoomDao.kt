@@ -65,59 +65,11 @@ abstract class ChatRoomDao : BaseDao<ChatRoomEntity> {
         """)
     abstract fun getAllGrouped(): LiveData<List<ChatRoom>>
 
-        @Transaction
-        @Query("""
-        $BASE_QUERY
-        $FILTER_NOT_OPENED
-        ORDER BY
-            $UNREAD,
-	        CASE
-		        WHEN lastMessageTimeStamp IS NOT NULL THEN lastMessageTimeStamp
-		        ELSE updatedAt
-	        END DESC
-        """)
-    abstract fun getAllUnread(): LiveData<List<ChatRoom>>
-
     @Transaction
     @Query("""
         $BASE_QUERY
         $FILTER_NOT_OPENED
-        ORDER BY
-            $UNREAD,
-            name COLLATE NOCASE
-        """)
-    abstract fun getAllAlphabeticallyUnread(): LiveData<List<ChatRoom>>
-
-    @Transaction
-    @Query("""
-        $BASE_QUERY
-        $FILTER_NOT_OPENED
-        ORDER BY
-            $TYPE_ORDER,
-            $UNREAD,
-            name COLLATE NOCASE
-        """)
-    abstract fun getAllAlphabeticallyGroupedUnread(): LiveData<List<ChatRoom>>
-
-    @Transaction
-    @Query("""
-        $BASE_QUERY
-        $FILTER_NOT_OPENED
-        ORDER BY
-            $TYPE_ORDER,
-            $UNREAD,
-	        CASE
-		        WHEN lastMessageTimeStamp IS NOT NULL THEN lastMessageTimeStamp
-		        ELSE updatedAt
-	        END DESC
-        """)
-    abstract fun getAllGroupedUnread(): LiveData<List<ChatRoom>>
-
-    @Transaction
-    @Query("""
-        $BASE_QUERY
-        $FILTER_NOT_OPENED
-        ORDER BY name COLLATE NOCASE
+        ORDER BY name
         """)
     abstract fun getAllAlphabetically(): LiveData<List<ChatRoom>>
 
@@ -127,7 +79,7 @@ abstract class ChatRoomDao : BaseDao<ChatRoomEntity> {
         $FILTER_NOT_OPENED
         ORDER BY
             $TYPE_ORDER,
-            name COLLATE NOCASE
+            name
         """)
     abstract fun getAllAlphabeticallyGrouped(): LiveData<List<ChatRoom>>
 
@@ -185,12 +137,6 @@ abstract class ChatRoomDao : BaseDao<ChatRoomEntity> {
 		        WHEN type = 'd' THEN 3
 		        WHEN type = 'l' THEN 4
 		        ELSE 5
-	        END
-        """
-        const val UNREAD = """
-            CASE
-		        WHEN alert OR unread > 0 THEN 1
-		        ELSE 2
 	        END
         """
     }

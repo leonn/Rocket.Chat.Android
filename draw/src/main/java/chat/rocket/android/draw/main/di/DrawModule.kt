@@ -15,7 +15,7 @@ class DrawModule {
     fun provideMainView(activity: DrawingActivity): DrawView = activity
 
     @Provides
-    fun provideJob(): Job = Job()
+    fun provideJob() = Job()
 
     @Provides
     fun provideLifecycleOwner(activity: DrawingActivity): LifecycleOwner = activity

@@ -49,10 +49,10 @@ class DirectoryFragment : Fragment(), DirectoryView {
             presenter.toChannel(channelId, channelName)
         }
         override fun onUserSelected(username: String, name: String) {
-            presenter.toDirectMessage(username, name)
+            presenter.tiDirectMessage(username, name)
         }
         override fun onGlobalUserSelected(username: String, name: String) {
-            presenter.toDirectMessage(username, name)
+            presenter.tiDirectMessage(username, name)
         }
     })
     private val hashtagDrawable by lazy {
@@ -168,11 +168,11 @@ class DirectoryFragment : Fragment(), DirectoryView {
     override fun showGenericErrorMessage() = showMessage(getString(R.string.msg_generic_error))
 
     override fun showLoading() {
-        ui { view_loading.isVisible = true }
+        view_loading.isVisible = true
     }
 
     override fun hideLoading() {
-        ui { view_loading.isVisible = false }
+        view_loading.isVisible = false
     }
 
     fun updateSorting(
@@ -233,14 +233,14 @@ class DirectoryFragment : Fragment(), DirectoryView {
     private fun updateSortByTitle() {
         if (isSortByChannels) {
             text_sort_by.text = getString(R.string.msg_channels)
-            DrawableHelper.compoundStartAndEndDrawable(
+            DrawableHelper.compoundLeftAndRightDrawable(
                 text_sort_by,
                 hashtagDrawable,
                 arrowDownDrawable
             )
         } else {
             text_sort_by.text = getString(R.string.msg_users)
-            DrawableHelper.compoundStartAndEndDrawable(
+            DrawableHelper.compoundLeftAndRightDrawable(
                 text_sort_by,
                 userDrawable,
                 arrowDownDrawable

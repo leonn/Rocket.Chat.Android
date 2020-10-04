@@ -30,22 +30,21 @@ import kotlinx.android.synthetic.main.app_bar_chat_room.*
 import kotlinx.android.synthetic.main.fragment_user_details.*
 import javax.inject.Inject
 
-fun newInstance(userId: String, chatRoomId: String): Fragment = UserDetailsFragment().apply {
-    arguments = Bundle(2).apply {
+fun newInstance(userId: String): Fragment = UserDetailsFragment().apply {
+    arguments = Bundle(1).apply {
         putString(BUNDLE_USER_ID, userId)
-        putString(BUNDLE_USER_CHATROOM_ID, chatRoomId)
     }
 }
 
 internal const val TAG_USER_DETAILS_FRAGMENT = "UserDetailsFragment"
 private const val BUNDLE_USER_ID = "user_id"
-private const val BUNDLE_USER_CHATROOM_ID = "user_chatroom_id"
 
 class UserDetailsFragment : Fragment(), UserDetailsView {
-    @Inject lateinit var presenter: UserDetailsPresenter
-    @Inject lateinit var analyticsManager: AnalyticsManager
+    @Inject
+    lateinit var presenter: UserDetailsPresenter
+    @Inject
+    lateinit var analyticsManager: AnalyticsManager
     private lateinit var userId: String
-    private lateinit var chatRoomId: String
     private val handler = Handler()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +53,6 @@ class UserDetailsFragment : Fragment(), UserDetailsView {
 
         arguments?.run {
             userId = getString(BUNDLE_USER_ID, "")
-            chatRoomId = getString(BUNDLE_USER_CHATROOM_ID, "")
         }
             ?: requireNotNull(arguments) { "no arguments supplied when the fragment was instantiated" }
     }
@@ -70,7 +68,6 @@ class UserDetailsFragment : Fragment(), UserDetailsView {
 
         setupToolbar()
         setupListeners()
-        presenter.checkRemoveUserPermission(chatRoomId)
         presenter.loadUserDetails(userId)
 
         analyticsManager.logScreenView(ScreenViewEvent.UserDetails)
@@ -82,15 +79,14 @@ class UserDetailsFragment : Fragment(), UserDetailsView {
     }
 
     override fun showUserDetailsAndActions(
-        avatarUrl: String?,
-        name: String?,
-        username: String?,
-        status: String?,
-        utcOffset: String?,
+        avatarUrl: String,
+        name: String,
+        username: String,
+        status: String,
+        utcOffset: String,
         isVideoCallAllowed: Boolean
     ) {
-        val requestBuilder = Glide.with(this)
-            .load(avatarUrl)
+        val requestBuilder = Glide.with(this).load(avatarUrl)
             .apply(RequestOptions.skipMemoryCacheOf(true))
             .apply(RequestOptions.diskCacheStrategyOf(DiskCacheStrategy.NONE))
 
@@ -101,44 +97,30 @@ class UserDetailsFragment : Fragment(), UserDetailsView {
         requestBuilder.apply(RequestOptions.bitmapTransform(RoundedCorners(14)))
             .into(image_avatar)
 
-        text_name.text = name ?: getString(R.string.msg_unknown)
-        text_username.text = username ?: getString(R.string.msg_unknown)
-
-        text_description_status.text = status?.capitalize() ?: getString(R.string.msg_unknown)
-
-        text_description_timezone.text = utcOffset ?: getString(R.string.msg_unknown)
-
-        text_video_call.isVisible = isVideoCallAllowed
+        text_name.text = name
+        text_username.text = username
+        text_description_status.text = status.substring(0, 1).toUpperCase() + status.substring(1)
+        text_description_timezone.text = utcOffset
 
         // We should also setup the user details listeners.
-        username?.run {
-            text_message.setOnClickListener { presenter.createDirectMessage(this) }
-            if (isVideoCallAllowed) {
-                text_video_call.setOnClickListener { presenter.toVideoConference(this) }
-            }
+        text_message.setOnClickListener { presenter.createDirectMessage(username) }
+
+        if (isVideoCallAllowed) {
+            text_video_call.isVisible = true
+            text_video_call.setOnClickListener { presenter.toVideoConference(username) }
+        } else {
+            text_video_call.isVisible = false
         }
     }
 
-    override fun showRemoveUserButton() {
-        button_remove_user?.isVisible = true
-    }
-
-    override fun hideRemoveUserButton() {
-        button_remove_user?.isVisible = false
-    }
-
-    override fun showUserRemovedMessage() {
-        activity?.onBackPressed()
-        showMessage(R.string.msg_user_removed_successfully)
-    }
-
     override fun showLoading() {
-        view_loading?.isVisible = true
+        group_user_details.isVisible = false
+        view_loading.isVisible = true
     }
 
     override fun hideLoading() {
-        view_loading?.isVisible = false
-        group_user_details?.isVisible = true
+        group_user_details.isVisible = true
+        view_loading.isVisible = false
     }
 
     override fun showMessage(resId: Int) {
@@ -167,7 +149,5 @@ class UserDetailsFragment : Fragment(), UserDetailsView {
 
     private fun setupListeners() {
         image_arrow_back.setOnClickListener { activity?.onBackPressed() }
-        image_avatar.setOnClickListener { with(presenter) { toProfileImage(getImageUri()) } }
-        button_remove_user.setOnClickListener { presenter.removeUser(userId, chatRoomId) }
     }
 }

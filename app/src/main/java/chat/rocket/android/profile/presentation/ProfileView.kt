@@ -2,8 +2,9 @@ package chat.rocket.android.profile.presentation
 
 import chat.rocket.android.core.behaviours.LoadingView
 import chat.rocket.android.core.behaviours.MessageView
+import chat.rocket.android.server.presentation.TokenView
 
-interface ProfileView : LoadingView, MessageView {
+interface ProfileView : TokenView, LoadingView, MessageView {
 
     /**
      * Shows the user profile.
@@ -30,11 +31,7 @@ interface ProfileView : LoadingView, MessageView {
     fun reloadUserAvatar(avatarUrl: String)
 
     /**
-     * It is called when the user profile was updated successfully.
+     * Shows a profile update successfully message
      */
-    fun onProfileUpdatedSuccessfully(
-        updatedEmail: String,
-        updatedName: String,
-        updatedUserName: String
-    )
+    fun showProfileUpdateSuccessfullyMessage()
 }

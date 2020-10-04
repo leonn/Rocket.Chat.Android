@@ -7,10 +7,3 @@ fun Long?.localDateTime(): LocalDateTime? {
         DateTimeHelper.getLocalDateTime(it)
     }
 }
-
-fun Long?.isGreaterThan(value: Int): Boolean {
-    this?.let {
-        return it > value
-    }
-    return false
-}

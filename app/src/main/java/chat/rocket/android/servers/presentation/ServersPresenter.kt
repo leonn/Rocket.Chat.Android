@@ -14,15 +14,13 @@ class ServersPresenter @Inject constructor(
     private val navigator: MainNavigator,
     private val strategy: CancelStrategy,
     private val getAccountsInteractor: GetAccountsInteractor,
-    @Named("currentServer") private val currentServerUrl: String?
+    @Named("currentServer") private val currentServerUrl: String
 ) {
 
     fun getAllServers() {
         launchUI(strategy) {
             try {
-                currentServerUrl?.let {
-                    view.showServerList(getAccountsInteractor.get(), it)
-                }
+                view.showServerList(getAccountsInteractor.get(), currentServerUrl)
             } catch (exception: Exception) {
                 Timber.e(exception, "Error loading servers")
                 exception.message?.let {

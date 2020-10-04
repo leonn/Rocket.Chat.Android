@@ -3,7 +3,7 @@ package chat.rocket.android.pinnedmessages.presentation
 import chat.rocket.android.chatroom.uimodel.UiModelMapper
 import chat.rocket.android.core.lifecycle.CancelStrategy
 import chat.rocket.android.db.DatabaseManager
-import chat.rocket.android.server.infrastructure.RocketChatClientFactory
+import chat.rocket.android.server.infraestructure.RocketChatClientFactory
 import chat.rocket.android.util.extension.launchUI
 import chat.rocket.common.RocketChatException
 import chat.rocket.common.model.roomTypeOf
@@ -18,11 +18,11 @@ class PinnedMessagesPresenter @Inject constructor(
     private val view: PinnedMessagesView,
     private val strategy: CancelStrategy,
     private val dbManager: DatabaseManager,
-    @Named("currentServer") private val currentServer: String?,
+    @Named("currentServer") private val currentServer: String,
     private val mapper: UiModelMapper,
     val factory: RocketChatClientFactory
 ) {
-    private val client: RocketChatClient? = currentServer?.let { factory.get(it) }
+    private val client: RocketChatClient = factory.get(currentServer)
     private var offset: Int = 0
 
     /**
@@ -35,11 +35,11 @@ class PinnedMessagesPresenter @Inject constructor(
             try {
                 view.showLoading()
                 dbManager.getRoom(roomId)?.let {
-                    client?.getPinnedMessages(roomId, roomTypeOf(it.chatRoom.type), offset)?.let {
-                        val messageList = mapper.map(it.result, asNotReversed = true)
-                        view.showPinnedMessages(messageList)
-                        offset += 1 * 30
-                    }
+                    val pinnedMessages =
+                            client.getPinnedMessages(roomId, roomTypeOf(it.chatRoom.type), offset)
+                    val messageList = mapper.map(pinnedMessages.result, asNotReversed = true)
+                    view.showPinnedMessages(messageList)
+                    offset += 1 * 30
                 }.ifNull {
                     Timber.e("Couldn't find a room with id: $roomId at current server.")
                 }

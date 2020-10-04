@@ -1,7 +1,6 @@
 package chat.rocket.android.analytics
 
 import chat.rocket.android.analytics.event.AuthenticationEvent
-import chat.rocket.android.analytics.event.InviteType
 import chat.rocket.android.analytics.event.ScreenViewEvent
 import chat.rocket.android.analytics.event.SubscriptionTypeEvent
 import com.crashlytics.android.answers.Answers
@@ -30,7 +29,7 @@ class AnswersAnalytics : Analytics {
 
     override fun logScreenView(event: ScreenViewEvent) =
         Answers.getInstance()
-            .logCustom(CustomEvent("screen_visualization").putCustomAttribute("screen", event.screenName))
+            .logCustom(CustomEvent("screen_view").putCustomAttribute("screen", event.screenName))
 
 
     override fun logMessageSent(event: SubscriptionTypeEvent, serverUrl: String) =
@@ -82,13 +81,6 @@ class AnswersAnalytics : Analytics {
                 CustomEvent("video_conference")
                     .putCustomAttribute("subscription_type", event.subscriptionTypeName)
                     .putCustomAttribute("server", serverUrl)
-            )
-
-    override fun logInviteSent(inviteType: InviteType) =
-        Answers.getInstance()
-            .logCustom(
-                CustomEvent("invite_sent")
-                    .putCustomAttribute("invite_type", inviteType.inviteTypeName)
             )
 
     override fun logMessageActionAddReaction() = Answers.getInstance().logCustom(CustomEvent("message_action_add_reaction"))

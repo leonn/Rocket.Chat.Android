@@ -6,9 +6,10 @@ import chat.rocket.android.core.lifecycle.CancelStrategy
 import chat.rocket.android.db.DatabaseManager
 import chat.rocket.android.db.DatabaseManagerFactory
 import chat.rocket.android.helper.OauthHelper
+import chat.rocket.android.infrastructure.LocalRepository
+import chat.rocket.android.main.presentation.MainNavigator
 import chat.rocket.android.server.domain.GetSettingsInteractor
 import chat.rocket.android.server.domain.PublicSettings
-import chat.rocket.android.server.domain.RefreshSettingsInteractor
 import chat.rocket.android.server.domain.casLoginUrl
 import chat.rocket.android.server.domain.gitlabUrl
 import chat.rocket.android.server.domain.isCasAuthenticationEnabled
@@ -21,9 +22,13 @@ import chat.rocket.android.server.domain.isLoginFormEnabled
 import chat.rocket.android.server.domain.isRegistrationEnabledForNewUsers
 import chat.rocket.android.server.domain.isWordpressAuthenticationEnabled
 import chat.rocket.android.server.domain.wordpressUrl
-import chat.rocket.android.server.infrastructure.ConnectionManager
-import chat.rocket.android.server.infrastructure.ConnectionManagerFactory
-import chat.rocket.android.server.infrastructure.RocketChatClientFactory
+import chat.rocket.android.server.domain.GetCurrentServerInteractor
+import chat.rocket.android.server.domain.RemoveAccountInteractor
+import chat.rocket.android.server.domain.TokenRepository
+import chat.rocket.android.server.domain.RefreshSettingsInteractor
+import chat.rocket.android.server.infraestructure.ConnectionManager
+import chat.rocket.android.server.infraestructure.ConnectionManagerFactory
+import chat.rocket.android.server.infraestructure.RocketChatClientFactory
 import chat.rocket.android.util.VersionInfo
 import chat.rocket.android.util.extension.launchUI
 import chat.rocket.android.util.extensions.casUrl
@@ -35,9 +40,15 @@ import chat.rocket.common.RocketChatException
 import chat.rocket.common.RocketChatInvalidProtocolException
 import chat.rocket.common.model.ServerInfo
 import chat.rocket.core.RocketChatClient
+import chat.rocket.core.internal.rest.logout
 import chat.rocket.core.internal.rest.serverInfo
 import chat.rocket.core.internal.rest.settingsOauth
+import chat.rocket.core.internal.rest.unregisterPushToken
+import chat.rocket.core.model.Myself
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 private const val SERVICE_NAME_FACEBOOK = "facebook"
@@ -51,16 +62,22 @@ abstract class CheckServerPresenter constructor(
     private val strategy: CancelStrategy,
     private val factory: RocketChatClientFactory,
     private val settingsInteractor: GetSettingsInteractor? = null,
+    private val serverInteractor: GetCurrentServerInteractor? = null,
+    private val localRepository: LocalRepository? = null,
+    private val removeAccountInteractor: RemoveAccountInteractor? = null,
+    private val tokenRepository: TokenRepository? = null,
     private val managerFactory: ConnectionManagerFactory? = null,
     private val dbManagerFactory: DatabaseManagerFactory? = null,
     private val versionCheckView: VersionCheckView? = null,
+    private val tokenView: TokenView? = null,
+    private val navigator: MainNavigator? = null,
     private val refreshSettingsInteractor: RefreshSettingsInteractor? = null
 ) {
     private lateinit var currentServer: String
-    private var client: RocketChatClient? = null
+    private lateinit var client: RocketChatClient
     private lateinit var settings: PublicSettings
-    private var connectionManager: ConnectionManager? = null
-    private var dbManager: DatabaseManager? = null
+    private lateinit var manager: ConnectionManager
+    private lateinit var dbManager: DatabaseManager
     internal var state: String = ""
     internal var facebookOauthUrl: String? = null
     internal var githubOauthUrl: String? = null
@@ -90,7 +107,7 @@ abstract class CheckServerPresenter constructor(
         currentServer = serverUrl
         client = factory.get(serverUrl)
         managerFactory?.create(serverUrl)?.let {
-            connectionManager = it
+            manager = it
         }
         dbManagerFactory?.create(serverUrl)?.let {
             dbManager = it
@@ -134,25 +151,25 @@ abstract class CheckServerPresenter constructor(
         return launchUI(strategy) {
             try {
                 currentServer = serverUrl
-                retryIO(description = "serverInfo", times = 5) {
-                    client?.serverInfo()?.let { serverInfo ->
-                        if (serverInfo.redirected) {
-                            versionCheckView?.updateServerUrl(serverInfo.url)
-                        }
-                        when (val version = checkServerVersion(serverInfo)) {
-                            is Version.VersionOk -> {
-                                Timber.i("Your version is nice! (Requires: 0.62.0, Yours: ${version.version})")
-                                versionCheckView?.versionOk()
-                            }
-                            is Version.RecommendedVersionWarning -> {
-                                Timber.i("Your server ${version.version} is bellow recommended version ${BuildConfig.RECOMMENDED_SERVER_VERSION}")
-                                versionCheckView?.alertNotRecommendedVersion()
-                            }
-                            is Version.OutOfDateError -> {
-                                Timber.i("Oops. Looks like your server ${version.version} is out-of-date! Minimum server version required ${BuildConfig.REQUIRED_SERVER_VERSION}!")
-                                versionCheckView?.blockAndAlertNotRequiredVersion()
-                            }
-                        }
+                val serverInfo = retryIO(description = "serverInfo", times = 5) {
+                    client.serverInfo()
+                }
+                if (serverInfo.redirected) {
+                    versionCheckView?.updateServerUrl(serverInfo.url)
+                }
+                val version = checkServerVersion(serverInfo)
+                when (version) {
+                    is Version.VersionOk -> {
+                        Timber.i("Your version is nice! (Requires: 0.62.0, Yours: ${version.version})")
+                        versionCheckView?.versionOk()
+                    }
+                    is Version.RecommendedVersionWarning -> {
+                        Timber.i("Your server ${version.version} is bellow recommended version ${BuildConfig.RECOMMENDED_SERVER_VERSION}")
+                        versionCheckView?.alertNotRecommendedVersion()
+                    }
+                    is Version.OutOfDateError -> {
+                        Timber.i("Oops. Looks like your server ${version.version} is out-of-date! Minimum server version required ${BuildConfig.REQUIRED_SERVER_VERSION}!")
+                        versionCheckView?.blockAndAlertNotRequiredVersion()
                     }
                 }
             } catch (ex: Exception) {
@@ -167,20 +184,72 @@ abstract class CheckServerPresenter constructor(
 
     internal suspend fun checkEnabledAccounts(serverUrl: String) {
         try {
-            retryIO("settingsOauth()") {
-                client?.settingsOauth()?.services?.let { services ->
-                    if (services.isNotEmpty()) {
-                        state = OauthHelper.getState()
-                        checkEnabledOauthAccounts(services, serverUrl)
-                        checkEnabledCasAccounts(services, serverUrl)
-                        checkEnabledCustomOauthAccounts(services, serverUrl)
-                        checkEnabledSamlAccounts(services, serverUrl)
-                    }
-                }
+            val services = retryIO("settingsOauth()") {
+                client.settingsOauth().services
+            }
+
+            if (services.isNotEmpty()) {
+                state = OauthHelper.getState()
+                checkEnabledOauthAccounts(services, serverUrl)
+                checkEnabledCasAccounts(services, serverUrl)
+                checkEnabledCustomOauthAccounts(services, serverUrl)
+                checkEnabledSamlAccounts(services, serverUrl)
             }
         } catch (exception: RocketChatException) {
             Timber.e(exception)
         }
+    }
+
+    /**
+     * Logout the user from the current server.
+     *
+     * @param userDataChannel the user data channel to stop listening to changes (if currently subscribed).
+     */
+    internal fun logout(userDataChannel: Channel<Myself>?) {
+        launchUI(strategy) {
+            try {
+                clearTokens()
+                retryIO("logout") { client.logout() }
+            } catch (exception: RocketChatException) {
+                Timber.e(exception, "Error calling logout")
+            }
+
+            try {
+                if (userDataChannel != null) {
+                    disconnect(userDataChannel)
+                }
+                removeAccountInteractor?.remove(currentServer)
+                tokenRepository?.remove(currentServer)
+                withContext(Dispatchers.IO) { dbManager.logout() }
+                navigator?.switchOrAddNewServer()
+            } catch (ex: Exception) {
+                Timber.e(ex, "Error cleaning up the session...")
+            }
+        }
+    }
+
+    /**
+     * Stops listening to user data changes and disconnects the user.
+     *
+     * @param userDataChannel the user data channel to stop listening to changes.
+     */
+    fun disconnect(userDataChannel: Channel<Myself>) {
+        manager.removeUserDataChannel(userDataChannel)
+        manager.disconnect()
+    }
+
+    private suspend fun clearTokens() {
+        serverInteractor?.clear()
+        val pushToken = localRepository?.get(LocalRepository.KEY_PUSH_TOKEN)
+        if (pushToken != null) {
+            try {
+                retryIO("unregisterPushToken") { client.unregisterPushToken(pushToken) }
+                tokenView?.invalidateToken(pushToken)
+            } catch (ex: Exception) {
+                Timber.e(ex, "Error unregistering push token")
+            }
+        }
+        localRepository?.clearAllFromServer(currentServer)
     }
 
     private fun checkEnabledOauthAccounts(services: List<Map<String,Any>>, serverUrl: String) {

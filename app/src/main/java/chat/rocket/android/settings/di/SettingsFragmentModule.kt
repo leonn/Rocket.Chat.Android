@@ -15,6 +15,7 @@ class SettingsFragmentModule {
     fun settingsView(frag: SettingsFragment): SettingsView {
         return frag
     }
+
     @Provides
     @PerFragment
     fun settingsLifecycleOwner(fragment: SettingsFragment): LifecycleOwner {

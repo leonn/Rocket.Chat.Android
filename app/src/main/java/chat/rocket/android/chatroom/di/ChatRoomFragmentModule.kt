@@ -44,10 +44,10 @@ class ChatRoomFragmentModule {
     @PerFragment
     fun provideGetCurrentUserInteractor(
         tokenRepository: TokenRepository,
-        @Named("currentServer") currentServer: String?,
+        @Named("currentServer") serverUrl: String,
         userDao: UserDao
     ): GetCurrentUserInteractor {
-        return currentServer?.let { GetCurrentUserInteractor(tokenRepository, it, userDao) }!!
+        return GetCurrentUserInteractor(tokenRepository, serverUrl, userDao)
     }
 
     @Provides
@@ -56,19 +56,15 @@ class ChatRoomFragmentModule {
         context: Application,
         repository: SettingsRepository,
         userInteractor: GetCurrentUserInteractor,
-        tokenRepository: TokenRepository,
-        @Named("currentServer") currentServer: String?,
+        @Named("currentServer") serverUrl: String,
         permissionsInteractor: PermissionsInteractor
     ): RoomUiModelMapper {
-        return currentServer?.let {
-            RoomUiModelMapper(
-                context,
-                repository.get(it),
-                userInteractor,
-                tokenRepository,
-                it,
-                permissionsInteractor
-            )
-        }!!
+        return RoomUiModelMapper(
+            context,
+            repository.get(serverUrl),
+            userInteractor,
+            serverUrl,
+            permissionsInteractor
+        )
     }
 }

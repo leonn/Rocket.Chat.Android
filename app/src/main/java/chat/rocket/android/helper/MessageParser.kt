@@ -70,9 +70,7 @@ class MessageParser @Inject constructor(
 
         message.mentions?.forEach {
             val mention = getMention(it)
-            if (mention.isNotEmpty()) {
-                mentions.add(mention)
-            }
+            mentions.add(mention)
             if (it.username != null) {
                 text = text.replace("@${it.username}", mention)
             }
@@ -96,16 +94,10 @@ class MessageParser @Inject constructor(
     }
 
     private fun getMention(user: SimpleUser): String {
-        user.id?.let {
-            if (SYSTEM_MENTIONS.contains(it)) {
-                return "@$it"
-            }
-        }
-
         return if (settings.useRealName()) {
-            user.name ?: user.username.orEmpty()
+            user.name ?: "@${user.username}"
         } else {
-            user.username.orEmpty()
+            "@${user.username}"
         }
     }
 
@@ -535,7 +527,5 @@ class MessageParser @Inject constructor(
          */
         private val WEB_URL = Pattern.compile(
             "($WEB_URL_WITH_PROTOCOL|$WEB_URL_WITHOUT_PROTOCOL)")
-
-        private val SYSTEM_MENTIONS = arrayOf("all", "here")
     }
 }

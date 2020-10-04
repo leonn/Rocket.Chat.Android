@@ -1,27 +1,19 @@
 package chat.rocket.android.videoconference.presenter
 
-import java.net.URL
-
 interface JitsiVideoConferenceView {
 
     /**
-     * Setups the video conference.
+     * Starts the Jitsi video conference.
      *
-     * @param serverURL The server URL of the video conference.
+     * @param url The video conference URL to be loaded.
+     * @param name The user name to be show on the video conference.
      */
-    fun setupVideoConference(serverURL: URL)
+    fun startJitsiVideoConference(url: String, name: String?)
 
     /**
-     * Starts the video conference.
-     *
-     * @param room The room of the video conference.
+     * Finishes the Jitsi video conference.
      */
-    fun startVideoConference(room: String)
-
-    /**
-     * Finishes the video conference.
-     */
-    fun finishVideoConference()
+    fun finishJitsiVideoConference()
 
     /**
      * Logs the state of the Jitsi Meet conference displayed in a JitsiMeetView.

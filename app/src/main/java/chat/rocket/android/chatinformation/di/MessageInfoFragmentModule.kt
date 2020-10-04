@@ -14,7 +14,7 @@ class MessageInfoFragmentModule {
 
     @Provides
     @PerFragment
-    fun provideJob(): Job = Job()
+    fun provideJob() = Job()
 
     @Provides
     @PerFragment

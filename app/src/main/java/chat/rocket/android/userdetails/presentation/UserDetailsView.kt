@@ -16,26 +16,11 @@ interface UserDetailsView : LoadingView, MessageView {
      * @param isVideoCallAllowed True if the video call is allowed, false otherwise.
      */
     fun showUserDetailsAndActions(
-        avatarUrl: String?,
-        name: String?,
-        username: String?,
-        status: String?,
-        utcOffset: String?,
+        avatarUrl: String,
+        name: String,
+        username: String,
+        status: String,
+        utcOffset: String,
         isVideoCallAllowed: Boolean
     )
-
-    /**
-     * Show Remove User Button
-     **/
-    fun showRemoveUserButton()
-
-    /**
-     * Hide Remove User Button
-     **/
-    fun hideRemoveUserButton()
-
-    /**
-     * Show a message that user is successfully removed
-     **/
-    fun showUserRemovedMessage()
 }

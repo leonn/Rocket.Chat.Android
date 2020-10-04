@@ -11,10 +11,9 @@ import chat.rocket.android.infrastructure.LocalRepository
 import chat.rocket.android.main.presentation.MainNavigator
 import chat.rocket.android.server.domain.SettingsRepository
 import chat.rocket.android.server.domain.SortingAndGroupingInteractor
-import chat.rocket.android.server.domain.siteName
 import chat.rocket.android.server.domain.useRealName
 import chat.rocket.android.server.domain.useSpecialCharsOnRoom
-import chat.rocket.android.server.infrastructure.ConnectionManager
+import chat.rocket.android.server.infraestructure.ConnectionManager
 import chat.rocket.android.util.extension.launchUI
 import chat.rocket.android.util.retryDB
 import chat.rocket.android.util.retryIO
@@ -22,19 +21,21 @@ import chat.rocket.common.RocketChatException
 import chat.rocket.common.model.RoomType
 import chat.rocket.common.model.User
 import chat.rocket.common.model.roomTypeOf
-import chat.rocket.core.internal.rest.createDirectMessage
+import chat.rocket.core.internal.realtime.createDirectMessage
 import chat.rocket.core.internal.rest.me
 import chat.rocket.core.internal.rest.show
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Named
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 class ChatRoomsPresenter @Inject constructor(
     private val view: ChatRoomsView,
     private val strategy: CancelStrategy,
     private val navigator: MainNavigator,
-    @Named("currentServer") private val currentServer: String?,
+    @Named("currentServer") private val currentServer: String,
     private val sortingAndGroupingInteractor: SortingAndGroupingInteractor,
     private val dbManager: DatabaseManager,
     manager: ConnectionManager,
@@ -43,7 +44,7 @@ class ChatRoomsPresenter @Inject constructor(
     settingsRepository: SettingsRepository
 ) {
     private val client = manager.client
-    private val settings = currentServer?.let { settingsRepository.get(it) }
+    private val settings = settingsRepository.get(currentServer)
 
     fun toCreateChannel() = navigator.toCreateChannel()
 
@@ -51,20 +52,16 @@ class ChatRoomsPresenter @Inject constructor(
 
     fun toDirectory() = navigator.toDirectory()
 
-    fun getCurrentServerName() = currentServer?.let {
-        view.setupToolbar(settings?.siteName() ?: it)
-    }
+    fun getCurrentServerName() = view.setupToolbar(currentServer)
 
     fun getSortingAndGroupingPreferences() {
         with(sortingAndGroupingInteractor) {
-            currentServer?.let {
-                view.setupSortingAndGrouping(
-                    getSortByName(it),
-                    getUnreadOnTop(it),
-                    getGroupByType(it),
-                    getGroupByFavorites(it)
-                )
-            }
+            view.setupSortingAndGrouping(
+                getSortByName(currentServer),
+                getUnreadOnTop(currentServer),
+                getGroupByType(currentServer),
+                getGroupByFavorites(currentServer)
+            )
         }
     }
 
@@ -96,7 +93,6 @@ class ChatRoomsPresenter @Inject constructor(
                         val entity = ChatRoomEntity(
                             id = id,
                             subscriptionId = "",
-                            parentId = null,
                             type = type.toString(),
                             name = username ?: name.toString(),
                             fullname = name.toString(),
@@ -117,8 +113,7 @@ class ChatRoomsPresenter @Inject constructor(
         with(chatRoom) {
             val isDirectMessage = roomTypeOf(type) is RoomType.DirectMessage
             val roomName =
-                if ((settings?.useSpecialCharsOnRoom() == true) ||
-                    (isDirectMessage && settings?.useRealName() == true)) {
+                if (settings.useSpecialCharsOnRoom() || (isDirectMessage && settings.useRealName())) {
                     fullname ?: name
                 } else {
                     name
@@ -128,7 +123,7 @@ class ChatRoomsPresenter @Inject constructor(
             if (myself?.username == null) {
                 view.showMessage(R.string.msg_generic_error)
             } else {
-                val id = if (isDirectMessage && open == false) {
+                val id = if (isDirectMessage && !open) {
                     // If from local database, we already have the roomId, no need to concatenate
                     if (local) {
                         retryIO {
@@ -138,11 +133,8 @@ class ChatRoomsPresenter @Inject constructor(
                     } else {
                         retryIO("createDirectMessage($name)") {
                             withTimeout(10000) {
-                                try {
-                                    client.createDirectMessage(name)
-                                } catch (ex: Exception) {
-                                    Timber.e(ex)
-                                }
+                                createDirectMessage(name)
+                                FetchChatRoomsInteractor(client, dbManager).refreshChatRooms()
                             }
                         }
                         val fromTo = mutableListOf(myself.id, id).apply {
@@ -153,8 +145,6 @@ class ChatRoomsPresenter @Inject constructor(
                 } else {
                     id
                 }
-
-                FetchChatRoomsInteractor(client, dbManager).refreshChatRooms()
 
                 navigator.toChatRoom(
                     chatRoomId = id,
@@ -185,12 +175,16 @@ class ChatRoomsPresenter @Inject constructor(
                 emails = null,
                 roles = myself.roles
             )
-            currentServer?.let {
-                localRepository.saveCurrentUser(url = it, user = user)
-            }
+            localRepository.saveCurrentUser(url = currentServer, user = user)
         } catch (ex: RocketChatException) {
             Timber.e(ex)
         }
         return null
+    }
+
+    private suspend fun createDirectMessage(name: String): Boolean = suspendCoroutine { cont ->
+        client.createDirectMessage(name) { success, _ ->
+            cont.resume(success)
+        }
     }
 }

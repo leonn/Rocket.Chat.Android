@@ -1,7 +1,6 @@
 package chat.rocket.android.analytics
 
 import chat.rocket.android.analytics.event.AuthenticationEvent
-import chat.rocket.android.analytics.event.InviteType
 import chat.rocket.android.analytics.event.ScreenViewEvent
 import chat.rocket.android.analytics.event.SubscriptionTypeEvent
 import chat.rocket.android.server.domain.AnalyticsTrackingInteractor
@@ -81,12 +80,6 @@ class AnalyticsManager @Inject constructor(
     fun logVideoConference(event: SubscriptionTypeEvent) {
         if (analyticsTrackingInteractor.get() && serverUrl != null) {
             analytics.forEach { it.logVideoConference(event, serverUrl) }
-        }
-    }
-
-    fun logInviteSent(inviteType: InviteType) {
-        if (analyticsTrackingInteractor.get()) {
-            analytics.forEach { it.logInviteSent(inviteType)}
         }
     }
 

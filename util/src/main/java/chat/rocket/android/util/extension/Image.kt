@@ -13,7 +13,8 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.IOException
 import java.io.File
-import org.threeten.bp.LocalDateTime
+import java.text.SimpleDateFormat
+import java.util.*
 
 /**
  * Compress a [Bitmap] image.
@@ -103,19 +104,20 @@ fun Fragment.dispatchImageSelection(requestCode: Int) {
 }
 
 fun Fragment.dispatchTakePicture(requestCode: Int) {
-    context?.packageManager?.let { packageManager ->
-        val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (takePictureIntent.resolveActivity(packageManager) != null) {
-            startActivityForResult(takePictureIntent, requestCode)
-        }
+    val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+    if (takePictureIntent.resolveActivity(context?.packageManager) != null) {
+        startActivityForResult(takePictureIntent, requestCode)
     }
 }
 
 @Throws(IOException::class)
 fun FragmentActivity.createImageFile(): File {
+    // Create an image file name
+    val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+    val storageDir: File =  getExternalFilesDir(Environment.DIRECTORY_PICTURES)
     return File.createTempFile(
-        "${LocalDateTime.now()}_",
-        ".png",
-        getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        "PNG_${timeStamp}_", /* prefix */
+        ".png", /* suffix */
+        storageDir /* directory */
     )
 }
